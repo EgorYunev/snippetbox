@@ -1,3 +1,3 @@
 package conf
 
-const Adr string = "localhost:8080"
+const Adr string = ":8080"
