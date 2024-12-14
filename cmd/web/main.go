@@ -1,11 +1,14 @@
 package main
 
 import (
+	"database/sql"
 	"flag"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 type application struct {
@@ -15,20 +18,23 @@ type application struct {
 
 func main() {
 	adr := flag.String("adr", ":8080", "HTTP Adress")
+	dns := flag.String("dns", "root:admin@tcp(localhost:33060)/snippetbox?parseTime=true", "DNS connecting to mysql")
 	flag.Parse()
 
 	infLog := log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime)
 	errLog := log.New(os.Stdout, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
 
+	db, err := openDB(*dns)
+
+	if err != nil {
+		errLog.Fatal(err)
+	}
+
+	defer db.Close()
+
 	app := &application{infLog, errLog}
 
-	http.HandleFunc("/", app.homeHandler)
-	http.HandleFunc("/snippet", app.showSnippet)
-	http.HandleFunc("/snippet/create", app.createSnippet)
-
-	fileServer := http.FileServer(neuteredFileSystem{http.Dir("./ui/static")})
-	http.Handle("/static", http.NotFoundHandler())
-	http.Handle("/static/", http.StripPrefix("/static", fileServer))
+	app.routs()
 
 	srv := &http.Server{
 		Addr:     *adr,
@@ -37,7 +43,7 @@ func main() {
 
 	infLog.Printf("Starting server on %s", *adr)
 
-	err := srv.ListenAndServe()
+	err = srv.ListenAndServe()
 	errLog.Fatal(err)
 }
 
@@ -65,4 +71,17 @@ func (nfs neuteredFileSystem) Open(path string) (http.File, error) {
 	}
 
 	return f, nil
+}
+
+func openDB(dns string) (*sql.DB, error) {
+	db, err := sql.Open("mysql", dns)
+
+	if err != nil {
+		return nil, err
+	}
+	if err = db.Ping(); err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }
