@@ -2,24 +2,41 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"net/http"
 	"strconv"
 )
 
-func homeHandler(w http.ResponseWriter, r *http.Request) {
+func (app *application) homeHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Path != "/" {
-		http.NotFound(w, r)
+		app.notFound(w)
 		return
+	}
+
+	ts, err := template.ParseFiles("./ui/html/home.page.html")
+
+	if err != nil {
+		app.errLog.Println(err.Error())
+		app.serverError(w, err)
+		return
+	}
+
+	err = ts.Execute(w, nil)
+
+	if err != nil {
+		app.errLog.Println(err.Error())
+		app.serverError(w, err)
 	}
 
 }
 
-func createSnippet(w http.ResponseWriter, r *http.Request) {
+func (app *application) createSnippet(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		app.errLog.Println("Method not allowed")
+		app.clientError(w, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -27,12 +44,12 @@ func createSnippet(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func showSnippet(w http.ResponseWriter, r *http.Request) {
+func (app *application) showSnippet(w http.ResponseWriter, r *http.Request) {
 
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 
 	if id < 0 || err != nil {
-		http.NotFound(w, r)
+		app.notFound(w)
 		return
 	}
 
